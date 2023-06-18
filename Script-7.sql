@@ -15,15 +15,26 @@ SELECT *, round((amount - LAG(amount) OVER(ORDER BY date_)) / LAG(amount) OVER(O
 SELECT * FROM (SELECT aircraft_code, array_agg(fare_conditions) AS fare
 	FROM (SELECT DISTINCT aircraft_code, fare_conditions FROM seats s ORDER BY aircraft_code, fare_conditions) f
 	GROUP BY aircraft_code) t
-WHERE fare[1] != 'Business' 
+WHERE 'Business' NOT IN (SELECT UNNEST(fare))
 
 --Найдите процентное соотношение перелётов по маршрутам от общего количества перелётов. Выведите в результат названия аэропортов и процентное отношение.
 --Используйте в решении оконную функцию.
 
-SELECT SUM(percentage) FROM (SELECT departure_airport, round((flight_count * 100.0 / total_flights), 2) AS percentage FROM
-  ( SELECT departure_airport, COUNT(*) AS flight_count, SUM(COUNT(*)) OVER () AS total_flights FROM flights
-    GROUP BY departure_airport ) AS subquery) t
+SELECT DISTINCT
+  route, departure_airport_name, arrival_airport_name, percentage
+FROM 
+(SELECT
+  route, flight_id, departure_airport_name, arrival_airport_name,
+  COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY route) AS percentage
+FROM 
+	(SELECT flight_id, r.flight_no AS route, departure_airport_name, arrival_airport_name
+	FROM flights f 
+	JOIN routes r ON r.flight_no = f.flight_no) t 
+GROUP BY route, flight_id, departure_airport_name, arrival_airport_name) f
+
   
+
+    
  --Классифицируйте финансовые обороты (сумму стоимости билетов) по маршрутам:
 --до 50 млн – low
 --от 50 млн включительно до 150 млн – middle
@@ -37,10 +48,11 @@ SELECT CASE
   END AS classification,
   COUNT(*) AS route_count
   FROM 
-    (SELECT departure_airport, SUM(amount) AS sum_amount
-	FROM (SELECT * FROM flights f
+    (SELECT flight_no, SUM(amount) AS sum_amount
+	FROM ( SELECT r.flight_no, ticket_no, amount FROM routes r
+		 JOIN flights f ON r.flight_no = f.flight_no
 		 JOIN ticket_flights tf ON f.flight_id = tf.flight_id) t
-		 GROUP BY departure_airport) AS subquery
+		 GROUP BY flight_no) AS subquery
 GROUP BY classification;
 
   --Вычислите медиану стоимости билетов, медиану стоимости бронирования и отношение медианы бронирования к медиане стоимости билетов, результат округлите до сотых. 
@@ -110,4 +122,3 @@ SELECT SUBSTRING((contact_data ->> 'phone') from 3 for 3) AS Код_операт
 FROM tickets t 
 WHERE contact_data ->> 'phone' LIKE '+7%'
 GROUP BY SUBSTRING((contact_data ->> 'phone') from 3 for 3);
- 
