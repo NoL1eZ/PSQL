@@ -20,17 +20,16 @@ WHERE 'Business' NOT IN (SELECT UNNEST(fare))
 --Найдите процентное соотношение перелётов по маршрутам от общего количества перелётов. Выведите в результат названия аэропортов и процентное отношение.
 --Используйте в решении оконную функцию.
 
-SELECT DISTINCT
-  route, departure_airport_name, arrival_airport_name, percentage
+SELECT departure_airport_name, arrival_airport_name, (routes * 100.0 / flight_count) AS percentage
 FROM 
-(SELECT
-  route, flight_id, departure_airport_name, arrival_airport_name,
-  COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (PARTITION BY route) AS percentage
-FROM 
-	(SELECT flight_id, r.flight_no AS route, departure_airport_name, arrival_airport_name
-	FROM flights f 
-	JOIN routes r ON r.flight_no = f.flight_no) t 
-GROUP BY route, flight_id, departure_airport_name, arrival_airport_name) f
+	(SELECT departure_airport_name, arrival_airport_name,  flight_count, COUNT(*) AS routes
+	FROM 
+		(SELECT f.flight_id, departure_airport_name, arrival_airport_name, COUNT(*) OVER () AS flight_count
+		FROM routes r
+		JOIN flights f ON r.flight_no = f.flight_no 
+		GROUP BY f.flight_id, departure_airport_name, arrival_airport_name) t
+	GROUP BY departure_airport_name, arrival_airport_name, flight_count
+	ORDER BY departure_airport_name) f
 
   
 
